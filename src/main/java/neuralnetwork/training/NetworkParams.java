@@ -1,6 +1,8 @@
 package neuralnetwork.training;
 
 import math.Tensor;
+import org.ejml.simple.SimpleMatrix;
+
 import java.util.function.DoubleUnaryOperator;
 
 public class NetworkParams {
@@ -9,6 +11,11 @@ public class NetworkParams {
     public NetworkParams(Tensor TW, Tensor Tb) {
         this.TW = TW;
         this.Tb = Tb;
+    }
+
+    public NetworkParams(int layers) {
+        TW = new Tensor(layers);
+        Tb = new Tensor(layers);
     }
 
     public NetworkParams plus(NetworkParams other) {
@@ -49,8 +56,17 @@ public class NetworkParams {
         Tb.set(np.Tb);
     }
 
+    public void set(int i, SimpleMatrix W, SimpleMatrix b) {
+        TW.set(i, W);
+        Tb.set(i, b);
+    }
+
+    public NetworkParams skeleton() {
+        return fill(0);
+    }
+
     @Override
     public String toString() {
-        return "NETWORK PARAMS\nTensor W: " + TW.toString() + "\nTensor b: " + Tb.toString();
+        return "NETWORK PARAMS {\nTensor W:\n" + TW.toString() + "\nTensor b:\n" + Tb.toString() + "}\n";
     }
 }

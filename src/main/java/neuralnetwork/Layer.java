@@ -5,7 +5,6 @@ import neuralnetwork.loss.Loss;
 import neuralnetwork.util.MechIndex;
 import neuralnetwork.util.Mechanics;
 import neuralnetwork.util.Operations;
-import org.ejml.data.Matrix;
 import org.ejml.simple.SimpleMatrix;
 
 import java.util.ArrayList;
@@ -14,19 +13,8 @@ import java.util.List;
 
 public class Layer {
     private final List<Neuron> neurons;
-    private final Mechanics mechanics; //default activation and loss functions; can be overrided by neurons individually
-
-    public Layer(List<Neuron> neurons, int prevLayerSize) {
-        this.neurons = neurons;
-        mechanics = new Mechanics(Activation.Linear, Loss.None);
-        initializeWeightsAndBiases(prevLayerSize);
-    }
-
-    public Layer(List<Neuron> neurons, Mechanics mechanics, int prevLayerSize) {
-        this.neurons = neurons;
-        this.mechanics = mechanics;
-        initializeWeightsAndBiases(prevLayerSize);
-    }
+    private Mechanics mechanics; //default activation and loss functions; can be overrided by neurons individually
+    private final int prevLayerSize;
 
     public Layer(int size, int prevLayerSize) {
         this(size, new Mechanics(Activation.Linear, Loss.None), prevLayerSize);
@@ -34,17 +22,19 @@ public class Layer {
 
     public Layer(int size, Mechanics mechanics, int prevLayerSize) {
         this.mechanics = mechanics;
+        this.prevLayerSize = prevLayerSize;
         neurons = constructNeurons(size, mechanics);
-        initializeWeightsAndBiases(prevLayerSize);
+        initializeWeightsAndBiases();
     }
 
     public Layer(int size, Mechanics[] mechanics, int prevLayerSize) {
         neurons = constructNeurons(size, mechanics);
         this.mechanics = new Mechanics(Activation.Linear, Loss.None);
-        initializeWeightsAndBiases(prevLayerSize);
+        this.prevLayerSize = prevLayerSize;
+        initializeWeightsAndBiases();
     }
 
-    private void initializeWeightsAndBiases(int prevLayerSize) {
+    private void initializeWeightsAndBiases() {
         for (Neuron neuron : neurons) {
             double[] data = Operations.fill(0.0, prevLayerSize);
             neuron.initWandB(Operations.rowVector(data), 0.0);
@@ -61,6 +51,14 @@ public class Layer {
         }
 
         return this;
+    }
+
+    public void setDenseMechanics(Mechanics mechs) {
+        for (Neuron neuron : neurons) {
+            neuron.mechanics = mechs;
+        }
+
+        mechanics = mechs;
     }
 
     public List<Neuron> getNeurons() {
@@ -85,8 +83,7 @@ public class Layer {
     }
 
     public SimpleMatrix getWeights() { // weight matrix W
-        int cols = neurons.get(0).weights.numCols(); //prev activations
-        double[][] W = new double[neurons.size()][cols];
+        double[][] W = new double[neurons.size()][prevLayerSize]; //cols = prevLayerSize
 
         for (int i = 0; i < W.length; i++) {
             for (int j = 0; j < W[i].length; j++) {
@@ -115,6 +112,18 @@ public class Layer {
     public void setWeights(SimpleMatrix W) {
         for (int i = 0, rows = W.numRows(); i < rows; i++) {
             neurons.get(i).weights = W.extractVector(true, i);
+        }
+    }
+
+    public void zeroWeights() {
+        for (Neuron neuron : neurons) {
+            neuron.weights.zero();
+        }
+    }
+
+    public void zeroBiases() {
+        for (Neuron neuron : neurons) {
+            neuron.bias = 0.0;
         }
     }
 
@@ -164,18 +173,18 @@ public class Layer {
     }
 
     public static List<Neuron> constructNeurons(int size, Mechanics mech) {
-        List<Neuron> ns = new ArrayList<>(size);
+        List<Neuron> ns = new ArrayList<>();
         for (int i = 0; i < size; i++) {
-            ns.set(i, new Neuron(mech));
+            ns.add(new Neuron(mech));
         }
 
         return ns;
     }
 
     public static List<Neuron> constructNeurons(int size, Mechanics[] mechs) {
-        List<Neuron> ns = new ArrayList<>(size);
+        List<Neuron> ns = new ArrayList<>();
         for (int i = 0; i < size; i++) {
-            ns.set(i, new Neuron(mechs[i]));
+            ns.add(new Neuron(mechs[i]));
         }
 
         return ns;

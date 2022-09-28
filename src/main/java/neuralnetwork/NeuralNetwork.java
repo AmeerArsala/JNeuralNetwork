@@ -4,12 +4,12 @@ import math.Tensor;
 import neuralnetwork.training.LearningAlgorithm;
 import neuralnetwork.training.NetworkParams;
 import neuralnetwork.training.TrainingExample;
+import neuralnetwork.util.MechIndex;
 import neuralnetwork.util.MechNetworkIndex;
 import neuralnetwork.util.Mechanics;
 import neuralnetwork.util.Operations;
 import org.ejml.simple.SimpleMatrix;
 
-import java.util.LinkedList;
 import java.util.List;
 import java.util.function.DoubleUnaryOperator;
 
@@ -34,6 +34,7 @@ public class NeuralNetwork {
         reset(); //initialize weights and biases
     }
 
+    //For targeting individual neurons in the network
     public NeuralNetwork setMechanics(MechNetworkIndex... mechs) {
         for (MechNetworkIndex mechI : mechs) {
             layers[mechI.layer].setMechanics(mechI.mechIndex);
@@ -42,13 +43,24 @@ public class NeuralNetwork {
         return this;
     }
 
+    //For targeting entire layers in the network
+    public NeuralNetwork setDenseMechanics(MechIndex... mechs) {
+        for (MechIndex mechIndex : mechs) {
+            layers[mechIndex.i].setDenseMechanics(mechIndex.mechanics);
+        }
+
+        return this;
+    }
+
     //randomize w and b everywhere
     public void reset() {
         NetworkParams networkParams = getNetworkParams(); // get current params of ANN, specifically the "shape" matters here
-
         DoubleUnaryOperator randomization = (theta) -> { return Math.random(); }; // reset operation
 
-        setNetworkParams(networkParams.applyEntrywise(randomization));
+        layers[0].zeroWeights();
+
+        setNetworkParams(networkParams.applyEntrywise(randomization), 1); // not input layer, already has weights set to 0
+
     }
 
     public Layer getLayer(int i) {
@@ -77,7 +89,11 @@ public class NeuralNetwork {
     }
 
     public void setNetworkParams(NetworkParams netParams) {
-        for (int l = 0; l < layers.length; l++) {
+        setNetworkParams(netParams, 0);
+    }
+
+    public void setNetworkParams(NetworkParams netParams, int startLayer) {
+        for (int l = startLayer; l < layers.length; l++) {
             List<Neuron> neurons = layers[l].getNeurons();
             SimpleMatrix W_l = netParams.TW.get(l);
             SimpleMatrix b_l = netParams.Tb.get(l);
@@ -101,53 +117,68 @@ public class NeuralNetwork {
     }
 
     private NetworkParams calculateGradient(List<TrainingExample> trainingExamples) {
-        List<NetworkParams> allNetworkParams = new LinkedList<>(); //for data collection per training step
+        //List<NetworkParams> allGradients = new LinkedList<>(); //for data collection per training step
 
         NetworkParams networkParams = getNetworkParams();
-        NetworkParams gradient = getNetworkParams().fill(0);
+        NetworkParams gradient = networkParams.skeleton();
 
-        for (TrainingExample trainingExample : trainingExamples) {
-            NetworkParams gradients = backpropagation(trainingExample, networkParams);
+        for (int i = 0; i < trainingExamples.size(); i++) {
+            System.err.println("Training Example " + "(" + i + ")");
+            NetworkParams grad_i = backpropagation(trainingExamples.get(i), networkParams);
 
-            gradient = gradient.plus(gradients); //sum gradients of each training example
-            allNetworkParams.add(gradients);
+            System.err.println("GRADIENT (" + i + "):\n" + grad_i);
+            gradient = gradient.plus(grad_i); //sum gradients of each training example
+
+            System.err.println("i = " + i + " -> GRADIENT:\n" + gradient);
+            //allGradients.add(grad_i);
         }
 
-        System.out.println(allNetworkParams);
+        //Debug.printAll(allGradients, System.err);
         return gradient.divide(trainingExamples.size()); //take the average
     }
 
     private NetworkParams backpropagation(TrainingExample trainingExample, NetworkParams networkParams) {
-        Tensor T_W = new Tensor(layers.length), T_b = new Tensor(layers.length);
-        Tensor allActivations = predictWithAllStats(trainingExample.X);
+        NetworkParams gradients = networkParams.skeleton();
+        Tensor allActivations = predictWithAllStats(trainingExample.X); //PREDICTION
 
-        //fill input layer with 0 so no change occurs
-        SimpleMatrix input_W = networkParams.TW.get(0).copy(), input_b = networkParams.Tb.get(0).copy();
-        input_W.fill(0);
-        input_b.fill(0);
-        T_W.set(0, input_W);
-        T_b.set(0, input_b);
+        System.err.println("PREDICTED FROM " + trainingExample.toString());
 
         //backpropagation
-        Layer currentLayer = layers[layers.length - 1];
-        SimpleMatrix activations = allActivations.getLast(), prevActivations = allActivations.get(layers.length - 2);
-        List<Mechanics> mechsList = currentLayer.getActualMechanics();
+        int L = layers.length - 1;
 
-        SimpleMatrix error = baseError(activations, trainingExample.Y, currentLayer.Z(prevActivations), mechsList);
-        for (int l = layers.length - 1; l > 0; l--) {
-            SimpleMatrix W_lplus1 = currentLayer.getWeights();
+        Layer currentLayer = layers[L];
+        SimpleMatrix prevActivations_L = allActivations.get(L - 1);
+
+        SimpleMatrix error = baseError(   // error_L
+                allActivations.getLast(), // predicted activations
+                trainingExample.Y,        // actual activations
+                currentLayer.Z(prevActivations_L),
+                currentLayer.getActualMechanics()
+        );
+        gradients.set(L,
+                Operations.plotMatrix(prevActivations_L, error),   // TW
+                error.copy()                                       // Tb
+        );
+
+        SimpleMatrix W_lplus1 = currentLayer.getWeights();
+
+        for (int l = L - 1; l > 0; --l) {
             currentLayer = layers[l]; // switch to current layer
+            SimpleMatrix prevActivations_l = allActivations.get(l - 1);
+            SimpleMatrix primedActivations = currentLayer.primedActivations(prevActivations_l);
 
-            SimpleMatrix primedActivations = currentLayer.primedActivations(allActivations.get(l));
+            error = (W_lplus1.transpose().mult(error)).elementMult(primedActivations); // propagate backwards
+            SimpleMatrix gradJ$W_l = Operations.plotMatrix(prevActivations_l, error);
 
-            error = (W_lplus1.transpose().mult(error)).elementMult(primedActivations);
-            SimpleMatrix gradJ$W_l = Operations.plotMatrix(allActivations.get(l - 1), error);
+            gradients.set(l,
+                    gradJ$W_l,   // TW
+                    error.copy() // Tb: gradJ$b_l = error_l
+            );
 
-            T_W.set(l, gradJ$W_l);
-            T_b.set(l, error); // gradJ$b_l = error_l
+            W_lplus1 = currentLayer.getWeights();
         }
 
-        return new NetworkParams(T_W, T_b);
+        return gradients;
     }
 
     //gradient of loss with respect to activations multiplied by primed activations
@@ -176,17 +207,11 @@ public class NeuralNetwork {
 
         Layer currentLayer = layers[0]; //current layer is input layer
 
-        //set weights to 0
-        SimpleMatrix w_0 = Operations.matrix(X.length, 1); //numCols = 1 because it can be pretty much anything, so smallest is better for less space
-        w_0.zero();
-
-        currentLayer.setWeights(w_0);
-
-        //This seems redundant, but it's because of looking at the stats and data of the neural network later
-        currentLayer.setBiases(X);
+        currentLayer.zeroWeights(); // weights are 0 in the input layer
+        currentLayer.setBiases(X);  // inputs in the input layer
 
         //Forward Propagation
-        SimpleMatrix activations = currentLayer.activations(w_0.copy());
+        SimpleMatrix activations = currentLayer.getBiases(); //might seem redundant but it's for ANN stats
         allActivations.set(0, activations.copy()); //data recording step
 
         for (int i = 1; i < layers.length; i++) {
@@ -196,24 +221,18 @@ public class NeuralNetwork {
             allActivations.set(i, activations.copy()); //data recording step
         }
 
-        System.out.println("Layer-wise activations: \n" + allActivations);
+        System.err.println("Layer-wise activations: \n" + allActivations);
         return allActivations;
     }
 
     public SimpleMatrix fastPredict(double[] X) { //doesn't record data
         Layer currentLayer = layers[0]; //current layer is input layer
 
-        //set weights to 0
-        SimpleMatrix w_0 = Operations.matrix(X.length, 1); //numCols = 1 because it can be pretty much anything, so smallest is better for less space
-        w_0.zero();
-
-        currentLayer.setWeights(w_0);
-
-        //This seems redundant, but it's because of looking at the stats and data of the neural network later
+        currentLayer.zeroWeights();
         currentLayer.setBiases(X);
 
         //Forward Propagation
-        SimpleMatrix activations = currentLayer.activations(w_0.copy());
+        SimpleMatrix activations = currentLayer.getBiases(); //might seem redundant but it's for ANN stats
 
         for (int i = 1; i < layers.length; i++) {
             currentLayer = layers[i];

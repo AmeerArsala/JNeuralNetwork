@@ -3,6 +3,7 @@ package neuralnetwork.util;
 import org.ejml.data.DMatrixRMaj;
 import org.ejml.simple.SimpleMatrix;
 
+import java.util.Arrays;
 import java.util.function.DoubleUnaryOperator;
 
 public class Operations {
@@ -18,9 +19,7 @@ public class Operations {
 
     public static double[] fill(double val, int length) {
         double[] arr = new double[length];
-        for (int i = 0; i < arr.length; i++) {
-            arr[i] = val;
-        }
+        Arrays.fill(arr, val);
 
         return arr;
     }
@@ -30,6 +29,20 @@ public class Operations {
     }
 
     public static SimpleMatrix rowVector(double[] data) {
+        return SimpleMatrix.wrap(new DMatrixRMaj(data)).transpose();
+    }
+
+    public static SimpleMatrix colVector(int fill, int length) {
+        double[] data = new double[length];
+        Arrays.fill(data, fill);
+
+        return SimpleMatrix.wrap(new DMatrixRMaj(data));
+    }
+
+    public static SimpleMatrix rowVector(int fill, int length) {
+        double[] data = new double[length];
+        Arrays.fill(data, fill);
+
         return SimpleMatrix.wrap(new DMatrixRMaj(data)).transpose();
     }
 
@@ -82,16 +95,18 @@ public class Operations {
         return arr;
     }
 
-    //like a plot of land or area
+    //like a plot of land or area, or punnett square
+    //input 2 vectors and out comes a matrix
     public static SimpleMatrix plotMatrix(SimpleMatrix horizontal, SimpleMatrix vertical) {
-        SimpleMatrix output = matrix(horizontal.numCols(), vertical.numRows());
-        for (int col = 0; col < horizontal.numCols(); col++) {
-            for (int row = 0; row < vertical.numRows(); row++) {
-                output.set(row, col, horizontal.get(col) * vertical.get(row));
+        int rows = Math.max(vertical.numRows(), vertical.numCols()), cols = Math.max(horizontal.numCols(), horizontal.numRows());
+        double[][] data = new double[rows][cols];
+        for (int row = 0; row < rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                data[row][col] = horizontal.get(col) * vertical.get(row);
             }
         }
 
-        return output;
+        return matrix(data);
     }
 
     public static boolean isVector(SimpleMatrix matrix) {
@@ -106,5 +121,17 @@ public class Operations {
         sb.append(">");
 
         return sb.toString();
+    }
+
+    public static String matrixToString(SimpleMatrix matrix) {
+        StringBuilder sb = new StringBuilder();
+        if (isVector(matrix)) {
+            sb.append(vectorToString(matrix));
+        } else {
+            sb.append(matrix.toString());
+        }
+
+        return sb.append(" (").append(matrix.numRows()).append("x").append(matrix.numCols()).append(")")
+                 .toString();
     }
 }

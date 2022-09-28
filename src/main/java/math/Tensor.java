@@ -208,17 +208,7 @@ public class Tensor { //very basic tensor
         StringBuilder sb = new StringBuilder();
 
         for (int i = 0; i < matrices.length; i++) {
-            sb.append("[").append(i).append("]: ");
-            SimpleMatrix matrix = matrices[i];
-            if (Operations.isVector(matrix)) {
-                sb.append("<").append(matrix.get(0));
-                for (int j = 1, length = matrix.numRows() * matrix.numCols(); j < length; j++) {
-                    sb.append(", ").append(matrix.get(j));
-                }
-                sb.append(">");
-            } else {
-                sb.append(matrix.toString());
-            }
+            sb.append("[").append(i).append("]: ").append(Operations.matrixToString(matrices[i])).append('\n');
         }
 
         return sb.toString();
