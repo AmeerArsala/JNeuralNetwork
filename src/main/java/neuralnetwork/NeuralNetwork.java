@@ -126,7 +126,7 @@ public class NeuralNetwork {
             System.err.println("Training Example " + "(" + i + ")");
             NetworkParams grad_i = backpropagation(trainingExamples.get(i), networkParams);
 
-            System.err.println("GRADIENT (" + i + "):\n" + grad_i);
+            //System.err.println("GRADIENT (" + i + "):\n" + grad_i);
             gradient = gradient.plus(grad_i); //sum gradients of each training example
 
             System.err.println("i = " + i + " -> GRADIENT:\n" + gradient);
@@ -186,12 +186,12 @@ public class NeuralNetwork {
         double[] error = new double[mechsList.size()];
         double[] zs = Operations.toArray(z);
         for (int i = 0; i < error.length; i++) {
-            Mechanics mech = mechsList.get(i);
+            Mechanics funcs = mechsList.get(i);
 
-            double ahat = predictedActivations.get(i);
-            double a = actualActivations.get(i);
+            double delJ_delAhat = funcs.loss.applyPartialDerivative(predictedActivations.get(i), actualActivations.get(i)); //actualActivations is fixed because this is with respect to predictedActivations
+            double delA_delZ = funcs.activation.autoApplyPartialDerivative(zs, i);
 
-            error[i] = mech.loss.applyPartialDerivative(ahat, a) * mech.activation.autoApplyPartialDerivative(zs, i);
+            error[i] = delJ_delAhat * delA_delZ; // delJ_delZ
         }
 
         return Operations.colVector(error);
@@ -221,6 +221,7 @@ public class NeuralNetwork {
             allActivations.set(i, activations.copy()); //data recording step
         }
 
+        //System.err.println("Layer-wise params: \n" + getNetworkParams().toString());
         System.err.println("Layer-wise activations: \n" + allActivations);
         return allActivations;
     }
@@ -232,7 +233,7 @@ public class NeuralNetwork {
         currentLayer.setBiases(X);
 
         //Forward Propagation
-        SimpleMatrix activations = currentLayer.getBiases(); //might seem redundant but it's for ANN stats
+        SimpleMatrix activations = Operations.colVector(X);
 
         for (int i = 1; i < layers.length; i++) {
             currentLayer = layers[i];

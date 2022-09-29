@@ -28,7 +28,7 @@ public abstract class LearningAlgorithm {
 
             @Override
             public List<TrainingExample> shuffleData() {
-                return trainingExamples;
+                return new ArrayList<>(trainingExamples);
             }
 
             @Override
