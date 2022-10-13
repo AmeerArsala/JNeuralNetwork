@@ -3,6 +3,7 @@ package neuralnetwork.training;
 import math.Tensor;
 import org.ejml.simple.SimpleMatrix;
 
+import java.util.function.DoubleConsumer;
 import java.util.function.DoubleUnaryOperator;
 
 public class NetworkParams {
@@ -17,6 +18,8 @@ public class NetworkParams {
         TW = new Tensor(layers);
         Tb = new Tensor(layers);
     }
+
+    public int layers() { return TW.size(); }
 
     public NetworkParams plus(NetworkParams other) {
         Tensor TW_2 = TW.plus(other.TW);
@@ -63,6 +66,31 @@ public class NetworkParams {
 
     public NetworkParams skeleton() {
         return fill(0);
+    }
+
+    public void forEach(DoubleConsumer cnsmr) {
+        int layers = layers();
+        for (int l = 0; l < layers; l++) {
+            SimpleMatrix W = TW.get(l), b = Tb.get(l);
+            for (int i = 0; i < W.numRows(); i++) {
+                for (int j = 0; j < W.numCols(); j++) {
+                    cnsmr.accept(W.get(i, j));
+                }
+
+                cnsmr.accept(b.get(i));
+            }
+        }
+    }
+
+    public int countParams() {
+        int count = 0;
+        int layers = layers();
+        for (int l = 0; l < layers; l++) {
+            SimpleMatrix W = TW.get(l), b = Tb.get(l);
+            count += W.getNumElements() + b.getNumElements();
+        }
+
+        return count;
     }
 
     @Override

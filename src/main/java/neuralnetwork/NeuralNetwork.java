@@ -63,6 +63,8 @@ public class NeuralNetwork {
 
     }
 
+    public int getNumLayers() { return layers.length; }
+
     public Layer getLayer(int i) {
         return layers[i];
     }
@@ -106,95 +108,17 @@ public class NeuralNetwork {
     }
 
     public void train(List<TrainingExample> allTrainingExamples, LearningAlgorithm learningAlgorithm) {
-        learningAlgorithm.init(allTrainingExamples);
         NetworkParams currentNetworkParams = getNetworkParams();
+        learningAlgorithm.init(allTrainingExamples, currentNetworkParams.skeleton());
 
         do {
-            NetworkParams gradient = calculateGradient(learningAlgorithm.shuffleData());
-            NetworkParams nextNetParams = learningAlgorithm.learnStep(currentNetworkParams, gradient);
+            /*NetworkParams gradient = calculateGradient(learningAlgorithm.shuffleData());
+            NetworkParams nextNetParams = learningAlgorithm.learnStep(currentNetworkParams, gradient);*/
+            NetworkParams nextNetParams = learningAlgorithm.learnStep(this, currentNetworkParams);
             setNetworkParams(nextNetParams);
+
+            System.err.println("NEW PARAMS: " + nextNetParams);
         } while (!learningAlgorithm.doesConverge());
-    }
-
-    private NetworkParams calculateGradient(List<TrainingExample> trainingExamples) {
-        //List<NetworkParams> allGradients = new LinkedList<>(); //for data collection per training step
-
-        NetworkParams networkParams = getNetworkParams();
-        NetworkParams gradient = networkParams.skeleton();
-
-        for (int i = 0; i < trainingExamples.size(); i++) {
-            System.err.println("Training Example " + "(" + i + ")");
-            NetworkParams grad_i = backpropagation(trainingExamples.get(i), networkParams);
-
-            //System.err.println("GRADIENT (" + i + "):\n" + grad_i);
-            gradient = gradient.plus(grad_i); //sum gradients of each training example
-
-            System.err.println("i = " + i + " -> GRADIENT:\n" + gradient);
-            //allGradients.add(grad_i);
-        }
-
-        //Debug.printAll(allGradients, System.err);
-        return gradient.divide(trainingExamples.size()); //take the average
-    }
-
-    private NetworkParams backpropagation(TrainingExample trainingExample, NetworkParams networkParams) {
-        NetworkParams gradients = networkParams.skeleton();
-        Tensor allActivations = predictWithAllStats(trainingExample.X); //PREDICTION
-
-        System.err.println("PREDICTED FROM " + trainingExample.toString());
-
-        //backpropagation
-        int L = layers.length - 1;
-
-        Layer currentLayer = layers[L];
-        SimpleMatrix prevActivations_L = allActivations.get(L - 1);
-
-        SimpleMatrix error = baseError(   // error_L
-                allActivations.getLast(), // predicted activations
-                trainingExample.Y,        // actual activations
-                currentLayer.Z(prevActivations_L),
-                currentLayer.getActualMechanics()
-        );
-        gradients.set(L,
-                Operations.plotMatrix(prevActivations_L, error),   // TW
-                error.copy()                                       // Tb
-        );
-
-        SimpleMatrix W_lplus1 = currentLayer.getWeights();
-
-        for (int l = L - 1; l > 0; --l) {
-            currentLayer = layers[l]; // switch to current layer
-            SimpleMatrix prevActivations_l = allActivations.get(l - 1);
-            SimpleMatrix primedActivations = currentLayer.primedActivations(prevActivations_l);
-
-            error = (W_lplus1.transpose().mult(error)).elementMult(primedActivations); // propagate backwards
-            SimpleMatrix gradJ$W_l = Operations.plotMatrix(prevActivations_l, error);
-
-            gradients.set(l,
-                    gradJ$W_l,   // TW
-                    error.copy() // Tb: gradJ$b_l = error_l
-            );
-
-            W_lplus1 = currentLayer.getWeights();
-        }
-
-        return gradients;
-    }
-
-    //gradient of loss with respect to activations multiplied by primed activations
-    private SimpleMatrix baseError(SimpleMatrix predictedActivations, SimpleMatrix actualActivations, SimpleMatrix z, List<Mechanics> mechsList) {
-        double[] error = new double[mechsList.size()];
-        double[] zs = Operations.toArray(z);
-        for (int i = 0; i < error.length; i++) {
-            Mechanics funcs = mechsList.get(i);
-
-            double delJ_delAhat = funcs.loss.applyPartialDerivative(predictedActivations.get(i), actualActivations.get(i)); //actualActivations is fixed because this is with respect to predictedActivations
-            double delA_delZ = funcs.activation.autoApplyPartialDerivative(zs, i);
-
-            error[i] = delJ_delAhat * delA_delZ; // delJ_delZ
-        }
-
-        return Operations.colVector(error);
     }
 
     public SimpleMatrix predict(double[] X) {
@@ -222,7 +146,7 @@ public class NeuralNetwork {
         }
 
         //System.err.println("Layer-wise params: \n" + getNetworkParams().toString());
-        System.err.println("Layer-wise activations: \n" + allActivations);
+        //System.err.println("Layer-wise activations: \n" + allActivations);
         return allActivations;
     }
 

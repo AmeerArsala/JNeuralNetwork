@@ -158,7 +158,7 @@ public class Layer {
     }
 
     //activations with respect to respective z
-    public SimpleMatrix primedActivations(SimpleMatrix prevActivations) {
+    public SimpleMatrix activationsPrime(SimpleMatrix prevActivations) {
         SimpleMatrix W = getWeights();
         SimpleMatrix b = getBiases();
 

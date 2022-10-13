@@ -1,11 +1,6 @@
 package main;
 
-import com.opencsv.CSVReader;
-import debug.Debug;
 import example.CountryEvaluation;
-import example.tool.CountryCodes;
-import example.tool.CountryColumns;
-import misc.GeneralUtils;
 import neuralnetwork.NeuralNetwork;
 import neuralnetwork.activation.Activation;
 import neuralnetwork.loss.Loss;
@@ -17,11 +12,8 @@ import neuralnetwork.util.Operations;
 import org.ejml.data.DMatrixRMaj;
 import org.ejml.simple.SimpleMatrix;
 
-import java.io.FileReader;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Scanner;
 
 public class Main {
 
@@ -40,14 +32,13 @@ public class Main {
                 new MechIndex(2, new Mechanics(Activation.Sigmoid, Loss.BinaryCrossentropy))
         );
 
-        double learningRate = 0.01;
+        double learningRate = 0.05;
         LearningAlgorithm learningAlgorithm = LearningAlgorithm.BatchGradientDescent(learningRate, 100);
 
         List<TrainingExample> trainingExamples = new ArrayList<>(countryEvaluation.sampleData());
         //trainingExamples.addAll(countryEvaluation.randomizedTrainingData(75, 0.0));
 
         countryEvaluation.neuralNetwork.train(trainingExamples, learningAlgorithm);
-
         countryEvaluation.run();
     }
 

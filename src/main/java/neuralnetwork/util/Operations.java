@@ -77,13 +77,13 @@ public class Operations {
     public static double derivative(DoubleUnaryOperator f, double x, int specificity) {
          double h = 1.0 / specificity;
 
-         return f.applyAsDouble(x + h) / h;
+         return (f.applyAsDouble(x + h) - f.applyAsDouble(x)) / h;
     }
 
     public static DoubleUnaryOperator derivative(DoubleUnaryOperator f, int specificity) {
         double h = 1.0 / specificity;
 
-        return (x) -> f.applyAsDouble(x + h) / h;
+        return (x) -> (f.applyAsDouble(x + h) - f.applyAsDouble(x)) / h;
     }
 
     public static double[] toArray(SimpleMatrix data) {
